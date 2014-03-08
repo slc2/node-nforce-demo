@@ -7,21 +7,29 @@ var express = require('express')
 var port = process.env.PORT || 3001; // use heroku's dynamic port or 3001 if localhost
 var oauth;
 
+
+// test with DE org 1
+var cid = process.env.CLIENT_ID || "yourclientid";
+var csecr = process.env.CLIENT_SECRET || "yourclientsecret";
+var lserv = process.env.LOGIN_SERVER || "https://login.salesforce.com";
+var redir = process.env.REDIRECT_URI || 'http://localhost:' + port + '/oauth/_callback';
+var username = process.env.USERNAME || 'ausername@xx.com';
+var password = process.env.PASSWORD || 'apassword'
+
 // use the nforce package to create a connection to salesforce.com
 var org = nforce.createConnection({
-  clientId: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-  redirectUri: 'http://localhost:' + port + '/oauth/_callback',
+  clientId: cid,
+  clientSecret: csecr,
+  redirectUri: redir,
   apiVersion: 'v24.0',  // optional, defaults to v24.0
   environment: 'production'  // optional, sandbox or production, production default
 });
 
 // authenticate using username-password oauth flow
-org.authenticate({ username: process.env.USERNAME, password: process.env.PASSWORD }, function(err, resp){
+org.authenticate({ username: username, password: password }, function(err, resp){
   if(err) {
     console.log('Error: ' + err.message);
   } else {
-    console.log('Access Token: ' + resp.access_token);
     oauth = resp;
   }
 });
@@ -52,7 +60,7 @@ app.get('/', routes.index);
 
 // display a list of 10 accounts
 app.get('/accounts', function(req, res) {
-  org.query('select id, name from account limit 10', oauth, function(err, resp){
+  org.query({ query: 'select id, name from account limit 10', oauth: oauth }, function(err, resp){
     res.render("accounts", { title: 'Accounts', data: resp.records } );
   });
 });
@@ -60,7 +68,7 @@ app.get('/accounts', function(req, res) {
 // display form to create a new account
 app.get('/accounts/new', function(req, res) {
   // call describe to dynamically generate the form fields
-  org.getDescribe('Account', oauth, function(err, resp) {
+  org.getDescribe({type: 'Account', oauth: oauth}, function(err, resp) {
     res.render('new', { title: 'New Account', data: resp })
   });
 });
@@ -68,7 +76,7 @@ app.get('/accounts/new', function(req, res) {
 // create the account in salesforce
 app.post('/accounts/create', function(req, res) {
   var obj = nforce.createSObject('Account', req.body.account);
-  org.insert(obj, oauth, function(err, resp){
+  org.insert({sobject: obj, oauth: oauth}, function(err, resp){
     if (err) {
       console.log(err);
     } else {
@@ -82,17 +90,18 @@ app.post('/accounts/create', function(req, res) {
 
 // display the account
 app.get('/accounts/:id', function(req, res) {
+
   var async = require('async');
   var obj = nforce.createSObject('Account', {id: req.params.id});
 
   async.parallel([
       function(callback){
-        org.query("select count() from contact where accountid = '" + req.params.id + "'", oauth, function(err, resp){
+        org.query({query: "select count() from contact where accountid = '" + req.params.id + "'", oauth: oauth}, function(err, resp){
           callback(null, resp);
         });
       },
       function(callback){
-        org.getRecord(obj, oauth, function(err, resp) {
+        org.getRecord({sobject: obj, oauth: oauth}, oauth, function(err, resp) {
           callback(null, resp);
         });
       },
@@ -108,7 +117,7 @@ app.get('/accounts/:id', function(req, res) {
 // display form to update an existing account
 app.get('/accounts/:id/edit', function(req, res) {
   var obj = nforce.createSObject('Account', {id: req.params.id});
-  org.getRecord(obj, oauth, function(err, resp) {
+  org.getRecord({sobject: obj, oauth: oauth}, oauth, function(err, resp) {
     res.render('edit', { title: 'Edit Account', data: resp });
   });
 });
@@ -116,7 +125,7 @@ app.get('/accounts/:id/edit', function(req, res) {
 // update the account in salesforce
 app.post('/accounts/:id/update', function(req, res) {
   var obj = nforce.createSObject('Account', req.body.account);
-  org.update(obj, oauth, function(results) {
+  org.update({sobject: obj, oauth: oauth}, function(results) {
     res.redirect('/accounts/'+req.params.id);
     res.end();
   }); 

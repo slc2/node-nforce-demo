@@ -8,8 +8,8 @@
   , "private": true
   , "dependencies": {
       "express": "2.5.8"
-    , "jade": "*"
-		, "nforce": "*"
-		, "async": "*"
+    , "jade": "1.3.x"
+		, "nforce": "0.7.x"
+		, "async": "0.2.x"
   }
 }
